@@ -16,48 +16,54 @@ var (
 )
 
 func TestGenerateKey(t *testing.T) {
-	ask, err := hex.DecodeString(aliceSK)
+	askhex, err := hex.DecodeString(aliceSK)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	apk := SecretKey(ask).Public()
+	ask := NewSecretKey(askhex)
+	apk := ask.Public()
 	if alicePK != hex.EncodeToString(apk[:]) {
 		t.Fatal("public key failed")
 	}
 
-	bsk, err := hex.DecodeString(bobSK)
+	bskhex, err := hex.DecodeString(bobSK)
 	if err != nil {
 		t.Fatal(err)
 	}
-	bpk := SecretKey(bsk).Public()
 
-	if bobPK != hex.EncodeToString(bpk) {
+	bsk := NewSecretKey(bskhex)
+	bpk := bsk.Public()
+	if bobPK != hex.EncodeToString(bpk[:]) {
 		t.Fatal("public key failed")
 	}
 
-	s1 := hex.EncodeToString(ComputeSecret(ask, bpk))
-	s2 := hex.EncodeToString(ComputeSecret(bsk, apk))
-	if s1 != s2 {
+	s1 := new([32]byte)
+	s2 := new([32]byte)
+	ask.Shared(s1, bpk)
+	bsk.Shared(s2, apk)
+	if !bytes.Equal(s1[:], s2[:]) {
 		t.Fatal("shared secret failed")
 	}
-	if s1 != sharedSecret {
+	if hex.EncodeToString(s1[:]) != sharedSecret {
 		t.Fatal("shared secret failed")
 	}
 }
 
 func TestGenerateKey2(t *testing.T) {
-	ourPK, ourSK, _ := GenerateKey(nil)
-	theirPK, theirSK, _ := GenerateKey(nil)
+	ourSK, _ := GenerateKey(nil)
+	theirSK, _ := GenerateKey(nil)
 
 	t.Logf("our secret = %0x", ourSK)
-	t.Logf("our public = %0x", ourPK)
+	t.Logf("our public = %0x", ourSK.Public())
 	t.Logf("their secret = %0x", theirSK)
-	t.Logf("their public = %0x", theirPK)
+	t.Logf("their public = %0x", theirSK.Public())
 
-	s1 := ComputeSecret(ourSK, theirPK)
-	s2 := ComputeSecret(theirSK, ourPK)
-	if !bytes.Equal(s1, s2) {
+	s1 := new([32]byte)
+	s2 := new([32]byte)
+	ourSK.Shared(s1, theirSK.Public())
+	theirSK.Shared(s2, ourSK.Public())
+	if !bytes.Equal(s1[:], s2[:]) {
 		t.Fatal("computed shared secrets differs")
 	}
 	t.Logf("shared secret = %0x", s1)
